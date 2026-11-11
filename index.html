@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PC FingerUnlock - Biometric Security Control Hub</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="cyber-grid-bg"></div>
+  <div class="glow-orb orb-1"></div>
+  <div class="glow-orb orb-2"></div>
+
+  <div class="app-container">
+    <!-- Header -->
+    <header class="hub-header">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2a10 10 0 0 0-1.9 19.82" />
+            <path d="M12 6a6 6 0 0 0-1.14 11.89" />
+            <path d="M12 10a2 2 0 0 0-.38 3.96" />
+          </svg>
+        </div>
+        <div>
+          <h1>PC FINGER<span>UNLOCK</span></h1>
+          <p class="tagline">Remote Windows Biometric Authentication Gateway</p>
+        </div>
+      </div>
+      
+      <div class="header-status">
+        <div class="status-pill" id="globalStatusPill">
+          <span class="status-dot pulsing"></span>
+          <span id="globalStatusText">FIREBASE CLOUD READY</span>
+        </div>
+        <button id="btnOpenGuide" class="btn-secondary">📖 Setup Guide (اردو)</button>
+      </div>
+    </header>
+
+    <!-- Main Grid -->
+    <main class="dashboard-grid">
+      
+      <!-- Left Column: Device Pairing & Biometric Remote -->
+      <section class="card glass hero-card">
+        <div class="card-header">
+          <div class="badge">DEVICE CONTROLLER</div>
+          <span class="session-code" id="deviceDisplayId">PC-WINDOWS-MASTER</span>
+        </div>
+
+        <div class="fingerprint-stage">
+          <div class="scanner-rings">
+            <div class="ring r1"></div>
+            <div class="ring r2"></div>
+            <div class="ring r3"></div>
+            <div class="fingerprint-pad" id="fingerprintSensorBtn" title="Click to Simulate Biometric Verification">
+              <svg class="fp-svg" viewBox="0 0 24 24">
+                <path d="M17.81,4.47c-0.08,0 -0.16,-0.02 -0.23,-0.06C15.66,3.42 14,3 12.01,3c-1.98,0 -3.86,0.47 -5.57,1.41 -0.24,0.13 -0.54,0.04 -0.68,-0.2 -0.13,-0.24 -0.04,-0.55 0.2,-0.68C7.82,2.52 9.86,2 12.01,2c2.13,0 3.99,0.47 5.95,1.51 0.24,0.13 0.33,0.43 0.2,0.67 -0.09,0.18 -0.21,0.29 -0.35,0.29zM3.51,9.77c-0.19,0 -0.37,-0.11 -0.45,-0.29 -0.11,-0.25 -0.01,-0.54 0.24,-0.66C5.07,7.91 8.24,7 11.99,7c3.78,0 7.21,0.97 9.09,1.96 0.24,0.13 0.34,0.42 0.21,0.67 -0.12,0.24 -0.42,0.34 -0.67,0.21 -1.72,-0.92 -4.95,-1.84 -8.63,-1.84 -3.53,0 -6.53,0.86 -8.22,1.72 -0.09,0.03 -0.17,0.05 -0.26,0.05zM17.27,15.64c-0.05,0 -0.09,-0.01 -0.14,-0.02 -0.83,-0.28 -2.48,-0.62 -4.63,-0.62 -2.14,0 -4.01,0.36 -4.89,0.66 -0.26,0.09 -0.54,-0.05 -0.63,-0.31 -0.09,-0.26 0.05,-0.54 0.31,-0.63 1.05,-0.36 3.12,-0.75 5.21,-0.75 2.33,0 4.15,0.37 5.1,0.69 0.26,0.09 0.4,0.37 0.31,0.63 -0.07,0.22 -0.29,0.35 -0.64,0.35zM12,18.5c-1.42,0 -2.71,-0.47 -3.73,-1.27 -0.21,-0.17 -0.24,-0.48 -0.08,-0.69 0.17,-0.21 0.48,-0.24 0.69,-0.08 0.84,0.65 1.9,1.04 3.12,1.04 1.18,0 2.21,-0.37 3.05,-1.02 0.21,-0.17 0.52,-0.13 0.69,0.08 0.16,0.21 0.13,0.52 -0.08,0.69 -1.02,0.79 -2.28,1.25 -3.66,1.25zM10.74,21.98c-0.12,0 -0.23,-0.04 -0.33,-0.13 -0.66,-0.6 -1.61,-1.76 -1.61,-3.85 0,-1.76 1.43,-3.19 3.19,-3.19s3.19,1.43 3.19,3.19c0,0.28 -0.22,0.5 -0.5,0.5s-0.5,-0.22 -0.5,-0.5c0,-1.21 -0.98,-2.19 -2.19,-2.19s-2.19,0.98 -2.19,2.19c0,1.73 0.81,2.69 1.34,3.17 0.21,0.19 0.23,0.5 0.04,0.71 -0.11,0.13 -0.27,0.2 -0.44,0.2z"/>
+              </svg>
+              <div class="laser-beam"></div>
+            </div>
+          </div>
+          <p class="sensor-caption" id="sensorStatusCaption">Touch Sensor to Unlock PC Remotely</p>
+          <span class="sub-caption">Verified via Android BiometricPrompt &amp; Encrypted Cloud Token</span>
+        </div>
+
+        <div class="action-btn-group">
+          <button id="btnUnlockPc" class="btn-primary-glow">
+            <span class="btn-icon">⚡</span>
+            <span>TRIGGER BIOMETRIC UNLOCK</span>
+          </button>
+          
+          <div class="dual-buttons">
+            <button id="btnLockPc" class="btn-danger">
+              <span>🔒 Remote Lock (Win+L)</span>
+            </button>
+            <button id="btnPingPc" class="btn-surface">
+              <span>📡 Test Ping</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Column: Settings, Pairing & Live Logs -->
+      <section class="right-column">
+        <!-- Pairing Card -->
+        <div class="card glass">
+          <div class="card-header">
+            <h3>🔗 CLOUD &amp; PAIRING CONFIGURATION</h3>
+          </div>
+          
+          <div class="form-grid">
+            <div class="input-field">
+              <label>Firebase Project ID</label>
+              <input type="text" id="cfgProjectId" value="win-finger-unlock" placeholder="e.g. win-finger-unlock">
+            </div>
+
+            <div class="input-field">
+              <label>Target PC Device ID</label>
+              <input type="text" id="cfgDeviceId" value="PC-WINDOWS-MASTER" placeholder="e.g. PC-ALPHA">
+            </div>
+
+            <div class="input-field">
+              <label>Pairing Secret Token</label>
+              <input type="password" id="cfgSecretToken" value="secret123" placeholder="Secret Token">
+            </div>
+
+            <div class="input-field">
+              <label>PC Local IP (Optional LAN Mode)</label>
+              <input type="text" id="cfgLocalIp" value="127.0.0.1" placeholder="192.168.x.x">
+            </div>
+          </div>
+
+          <div class="btn-row">
+            <button id="btnSaveConfig" class="btn-emerald">💾 Save Configuration</button>
+            <button id="btnGenerateQr" class="btn-surface">📱 Show Mobile Pairing QR</button>
+          </div>
+        </div>
+
+        <!-- Real-time Activity Logs -->
+        <div class="card glass logs-card">
+          <div class="card-header">
+            <h3>⚡ REAL-TIME SECURITY LOGS</h3>
+            <button id="btnClearLogs" class="btn-text">Clear</button>
+          </div>
+          <div class="logs-container" id="logsTerminal">
+            <div class="log-entry system"><span class="log-time">[INIT]</span> System initialized. Ready for Biometric signals.</div>
+            <div class="log-entry cloud"><span class="log-time">[CLOUD]</span> Listening on Firebase Firestore: /devices/PC-WINDOWS-MASTER</div>
+            <div class="log-entry client"><span class="log-time">[CLIENT]</span> PC Windows service compiled and ready (WinFingerUnlock.exe)</div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Live PC Screen Monitor Card -->
+    <section class="card glass stream-section">
+      <div class="card-header">
+        <div class="stream-title-group">
+          <div class="badge stream-badge-live">🎥 LIVE MONITOR</div>
+          <h3>PC SCREEN STREAM &amp; ACTIVITY VIEWER</h3>
+        </div>
+        <div class="stream-badges">
+          <div class="status-pill" id="webStreamStatusBadge">
+            <span class="status-dot" id="webStreamDot"></span>
+            <span id="webStreamStatusText">STREAM READY</span>
+          </div>
+          <span class="fps-pill" id="webStreamFps">0 FPS • -- ms</span>
+        </div>
+      </div>
+
+      <!-- Live Stream Display Canvas/Image -->
+      <div class="screen-monitor-box" id="screenMonitorBox">
+        <img id="webLiveScreen" alt="Live PC Screen Stream" class="screen-img" style="display: none;" />
+        <div class="monitor-placeholder" id="streamPlaceholder">
+          <div class="monitor-icon">🖥️</div>
+          <h4>Live PC Screen Monitoring</h4>
+          <p>Watch PC activity in real-time. Works over Local Wi-Fi (30+ FPS) or Firebase Cloud (Worldwide).</p>
+          <button id="btnStartStreamPlaceholder" class="btn-primary-glow stream-play-btn">
+            ▶️ Start Live Stream
+          </button>
+        </div>
+        <div class="stream-spinner" id="streamSpinner" style="display: none;">
+          <div class="spinner-circle"></div>
+          <span>Connecting to PC Screen Stream...</span>
+        </div>
+      </div>
+
+      <!-- Stream Control Toolbar -->
+      <div class="stream-toolbar">
+        <div class="stream-left-actions">
+          <button id="btnToggleStream" class="btn-emerald">
+            <span id="btnToggleStreamIcon">▶️</span> <span id="btnToggleStreamText">Start Stream</span>
+          </button>
+          <button id="btnRefreshWebStream" class="btn-surface">
+            🔄 Refresh
+          </button>
+          <button id="btnFullscreenStream" class="btn-surface">
+            ⛶ Fullscreen
+          </button>
+        </div>
+        <div class="stream-right-actions">
+          <button id="btnWebQuickLock" class="btn-danger">
+            🔒 Lock PC Now
+          </button>
+          <button id="btnWebQuickUnlock" class="btn-secondary">
+            ⚡ Unlock PC
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Modal: Setup Guide -->
+    <div class="modal-overlay" id="guideModal">
+      <div class="modal-content glass">
+        <div class="modal-header">
+          <h2>🔐 Windows PC Remote Fingerprint Setup Guide</h2>
+          <button class="modal-close" id="btnCloseGuide">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="guide-lang-tabs">
+            <h3>اردو مکمل طریقہ کار (Step-by-Step)</h3>
+          </div>
+          <ol class="guide-steps">
+            <li>
+              <strong>1. PC Application چلائیں:</strong>
+              <p>فولڈر <code>pc-client\WinFingerUnlock.exe</code> کو ڈبل کلک کرکے کھولیں۔ یہ Windows کی ٹرے میں پس منظر میں چلتی رہے گی۔</p>
+            </li>
+            <li>
+              <strong>2. Windows PIN محفوظ کریں:</strong>
+              <p>PC ایپلیکیشن میں اپنا Windows PIN یا پاس ورڈ درج کرکے <em>Save Settings</em> پر کلک کریں۔ یہ ونڈوز DPAPI اینکرپشن کے ساتھ محفوظ ہوجاتا ہے۔</p>
+            </li>
+            <li>
+              <strong>3. Android APK موبائل میں انسٹال کریں:</strong>
+              <p>موبائل کے اندر <code>android-app</code> کی تیار کردہ APK فائل انسٹال کریں اور کھولیں۔</p>
+            </li>
+            <li>
+              <strong>4. پیئرنگ (Pairing) کریں:</strong>
+              <p>موبائل میں سیٹنگز (Gear icon) دبا کر وہی <strong>Device ID</strong> اور <strong>Secret Key</strong> درج کریں جو PC ایپلیکیشن میں لکھی ہے۔</p>
+            </li>
+            <li>
+              <strong>5. انگلی لگائیں اور PC کھل جائے گا:</strong>
+              <p>موبائل میں <strong>⚡ SCAN &amp; UNLOCK PC</strong> دبائیں، آپ کے موبائل پر فنگر پرنٹ اسکینر کھلے گا۔ انگلی لگاتے ہی سیکنڈوں میں PC فورا ان لاک ہوجائے گا، چاہے آپ دنیا میں کہیں بھی ہوں!</p>
+            </li>
+          </ol>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: QR Code for Mobile -->
+    <div class="modal-overlay" id="qrModal">
+      <div class="modal-content glass qr-modal-box">
+        <div class="modal-header">
+          <h2>📱 Mobile Instant Pairing</h2>
+          <button class="modal-close" id="btnCloseQr">&times;</button>
+        </div>
+        <div class="modal-body text-center">
+          <p class="qr-sub">Scan with Android Camera or FingerUnlock APK to pair automatically:</p>
+          <div id="qrCanvasContainer" class="qr-box">
+            <!-- Dynamic Canvas -->
+          </div>
+          <div class="pairing-badge-row">
+            <span id="qrDeviceText">ID: PC-WINDOWS-MASTER</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
+
