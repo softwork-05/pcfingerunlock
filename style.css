@@ -73,7 +73,8 @@ body {
   z-index: 1;
   max-width: 1200px;
   margin: 0 auto;
-  padding: 30px 20px;
+  padding: clamp(16px, 3vw, 30px) clamp(12px, 3vw, 20px);
+  width: 100%;
 }
 
 /* Header */
@@ -727,5 +728,203 @@ body {
   align-items: center;
   gap: 10px;
 }
+
+/* ==========================================
+   Comprehensive Responsive System (Mobile, Tablet, Desktop)
+   ========================================== */
+
+/* Large Tablets & Medium Screens */
+@media (max-width: 1024px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}
+
+/* Tablets & Mobile Landscape */
+@media (max-width: 768px) {
+  .hub-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+    padding-bottom: 18px;
+    margin-bottom: 20px;
+  }
+
+  .brand h1 {
+    font-size: clamp(1.2rem, 4.5vw, 1.5rem);
+  }
+
+  .header-status {
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .status-pill {
+    padding: 6px 12px;
+    font-size: 0.75rem;
+  }
+
+  .card-header {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .stream-section .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .stream-badges {
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+
+  .screen-monitor-box {
+    max-height: 420px;
+  }
+}
+
+/* Mobile Devices (Phones) */
+@media (max-width: 640px) {
+  .card {
+    padding: clamp(16px, 4vw, 20px);
+    border-radius: 14px;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .btn-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .scanner-rings {
+    width: clamp(140px, 42vw, 170px);
+    height: clamp(140px, 42vw, 170px);
+    margin-bottom: 18px;
+  }
+
+  .fingerprint-pad {
+    width: clamp(80px, 22vw, 96px);
+    height: clamp(80px, 22vw, 96px);
+  }
+
+  .fp-svg {
+    width: clamp(48px, 14vw, 56px);
+    height: clamp(48px, 14vw, 56px);
+  }
+
+  .sensor-caption {
+    font-size: 1rem;
+  }
+
+  .stream-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .stream-left-actions,
+  .stream-right-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 8px;
+  }
+
+  .stream-left-actions button,
+  .stream-right-actions button {
+    width: 100%;
+    justify-content: center;
+    padding: 10px;
+  }
+
+  .modal-content {
+    width: 95%;
+    padding: 20px 16px;
+    max-height: 90vh;
+    border-radius: 16px;
+  }
+
+  .guide-steps {
+    padding-left: 14px;
+    font-size: 0.88rem;
+  }
+
+  .qr-box {
+    width: 180px;
+    height: 180px;
+  }
+}
+
+/* Small / Narrow Mobile Devices */
+@media (max-width: 480px) {
+  .brand {
+    gap: 12px;
+  }
+
+  .brand-icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .brand-icon svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .dual-buttons {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .btn-primary-glow {
+    padding: 14px;
+    font-size: 0.88rem;
+  }
+
+  .btn-danger,
+  .btn-surface,
+  .btn-emerald,
+  .btn-secondary {
+    min-height: 44px;
+  }
+
+  .logs-container {
+    height: 180px;
+    font-size: 0.78rem;
+  }
+
+  .monitor-placeholder {
+    padding: 18px 12px;
+  }
+
+  .monitor-icon {
+    font-size: 2.4rem;
+    margin-bottom: 8px;
+  }
+
+  .monitor-placeholder h4 {
+    font-size: 1rem;
+  }
+
+  .monitor-placeholder p {
+    font-size: 0.8rem;
+  }
+
+  .stream-left-actions,
+  .stream-right-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
 
 

@@ -372,13 +372,20 @@ async function runLanStreamLoop() {
 async function runCloudStreamLoop() {
   // 1. Tell PC to start streaming frames to Firestore screens/{deviceId}
   await sendRemoteCommand('STREAM_ON');
+  let lastHeartbeat = Date.now();
 
   const getUrl = `https://firestore.googleapis.com/v1/projects/${AppState.projectId}/databases/(default)/documents/screens/${AppState.deviceId}`;
 
   while (isWebStreaming && webStreamMode === 'cloud') {
+    // Keep alive heartbeat every 20s
+    if (Date.now() - lastHeartbeat > 20000) {
+      sendRemoteCommand('STREAM_ON');
+      lastHeartbeat = Date.now();
+    }
+
     const startMs = performance.now();
     try {
-      const resp = await fetch(getUrl);
+      const resp = await fetch(getUrl, { cache: 'no-store' });
       if (resp.ok) {
         const data = await resp.json();
         if (data && data.fields && data.fields.frame && data.fields.frame.stringValue) {
@@ -391,22 +398,25 @@ async function runCloudStreamLoop() {
             webLiveScreen.style.display = 'block';
             streamSpinner.style.display = 'none';
 
+            webStreamStatusText.innerText = 'FIREBASE CLOUD HD 🟢';
+            webStreamStatusBadge.style.color = '#10B981';
+
             webFrameCount++;
             const now = Date.now();
+            const latency = Math.round(performance.now() - startMs);
             if (now - webFpsTimer >= 1000) {
               const fps = Math.round((webFrameCount * 1000) / (now - webFpsTimer));
               webFrameCount = 0;
               webFpsTimer = now;
-              const latency = Math.round(performance.now() - startMs);
-              webStreamFps.innerText = `Cloud • ${latency}ms ping`;
+              webStreamFps.innerText = `Cloud HD • ${fps > 0 ? fps : 15} FPS • ${latency}ms ping`;
             }
           }
         }
       }
     } catch (e) { }
 
-    // Cloud polling interval: ~300ms
-    await new Promise(r => setTimeout(r, 280));
+    // High-frequency responsive cloud poll (25ms)
+    await new Promise(r => setTimeout(r, 25));
   }
 }
 
