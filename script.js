@@ -154,6 +154,10 @@ const btnWebQuickUnlock = document.getElementById('btnWebQuickUnlock');
 // Remote Control Elements
 const remoteControlBar = document.getElementById('remoteControlBar');
 const btnToggleControl = document.getElementById('btnToggleControl');
+const btnPanMode = document.getElementById('btnPanMode');
+const btnZoomOut = document.getElementById('btnZoomOut');
+const btnZoomReset = document.getElementById('btnZoomReset');
+const btnZoomIn = document.getElementById('btnZoomIn');
 const btnRemoteRightClick = document.getElementById('btnRemoteRightClick');
 const btnRemoteScrollUp = document.getElementById('btnRemoteScrollUp');
 const btnRemoteScrollDown = document.getElementById('btnRemoteScrollDown');
@@ -169,6 +173,10 @@ let rtcDataChannel = null;
 let rtcStatsTimer = null;
 let rtcHeartbeatTimer = null;
 let isControlEnabled = true;
+let isPanMode = false;
+let streamZoom = 1.0;
+let streamPanX = 0;
+let streamPanY = 0;
 let lastCtrlPos = { x: 0.5, y: 0.5 };
 let webFrameCount = 0;
 let webFpsTimer = Date.now();
@@ -701,13 +709,52 @@ function getNormalizedVideoPos(clientX, clientY, targetEl) {
   return lastCtrlPos;
 }
 
+function applyStreamZoomTransform() {
+  const box = screenMonitorBox;
+  const maxPanX = box ? (box.clientWidth * Math.max(0, streamZoom - 1)) / 2 : 0;
+  const maxPanY = box ? (box.clientHeight * Math.max(0, streamZoom - 1)) / 2 : 0;
+  streamPanX = Math.max(-maxPanX, Math.min(maxPanX, streamPanX));
+  streamPanY = Math.max(-maxPanY, Math.min(maxPanY, streamPanY));
+  const t = `translate(${streamPanX.toFixed(1)}px, ${streamPanY.toFixed(1)}px) scale(${streamZoom.toFixed(2)})`;
+  if (webRtcVideo) webRtcVideo.style.transform = t;
+  if (webLiveScreen) webLiveScreen.style.transform = t;
+  if (btnZoomReset) btnZoomReset.innerText = streamZoom.toFixed(1) + 'x';
+}
+
+function setStreamZoom(nextZoom) {
+  streamZoom = Math.max(1.0, Math.min(4.0, Math.round(nextZoom * 10) / 10));
+  if (streamZoom <= 1.01) {
+    streamZoom = 1.0;
+    streamPanX = 0;
+    streamPanY = 0;
+    if (isPanMode && btnPanMode) {
+      isPanMode = false;
+      btnPanMode.classList.remove('active-ctrl');
+      btnPanMode.innerText = '🖐️ Pan';
+    }
+  }
+  applyStreamZoomTransform();
+}
+
 function setupRemoteControlHandlers() {
   btnToggleControl.addEventListener('click', () => {
     isControlEnabled = !isControlEnabled;
-    btnToggleControl.innerText = isControlEnabled ? '🖱️ Control: ON' : '🖱️ Control: OFF';
+    btnToggleControl.innerText = isControlEnabled ? '🖱️ Mouse: ON' : '🖱️ Mouse: OFF';
     btnToggleControl.classList.toggle('active-ctrl', isControlEnabled);
     webRtcVideo.classList.toggle('control-active', isControlEnabled);
+    webLiveScreen.classList.toggle('control-active', isControlEnabled);
   });
+
+  if (btnPanMode) {
+    btnPanMode.addEventListener('click', () => {
+      isPanMode = !isPanMode;
+      btnPanMode.classList.toggle('active-ctrl', isPanMode);
+      btnPanMode.innerText = isPanMode ? '🖐️ Pan: ON' : '🖐️ Pan';
+    });
+  }
+  if (btnZoomIn) btnZoomIn.addEventListener('click', () => setStreamZoom(streamZoom + 0.5));
+  if (btnZoomOut) btnZoomOut.addEventListener('click', () => setStreamZoom(streamZoom - 0.5));
+  if (btnZoomReset) btnZoomReset.addEventListener('click', () => setStreamZoom(1.0));
 
   btnRemoteRightClick.addEventListener('click', () => {
     sendControlMsg({ t: 'rclick', x: lastCtrlPos.x, y: lastCtrlPos.y });
@@ -755,99 +802,145 @@ function setupRemoteControlHandlers() {
     });
   });
 
-  // Desktop Mouse Support on WebRTC Video
+  // Shared Desktop Mouse + Mobile Touch/Zoom/Pan Handler for both WebRTC Video & Fallback Cloud Image
   let lastMoveTs = 0;
-  webRtcVideo.addEventListener('mousemove', (e) => {
-    if (!isControlEnabled || webStreamMode !== 'webrtc') return;
-    const now = performance.now();
-    if (now - lastMoveTs < 30) return;
-    lastMoveTs = now;
-    const p = getNormalizedVideoPos(e.clientX, e.clientY);
-    sendControlMsg({ t: 'move', x: p.x, y: p.y });
-  });
-
-  webRtcVideo.addEventListener('mousedown', (e) => {
-    if (!isControlEnabled || webStreamMode !== 'webrtc') return;
-    const p = getNormalizedVideoPos(e.clientX, e.clientY);
-    sendControlMsg({ t: 'down', x: p.x, y: p.y, b: e.button === 2 ? 2 : 0 });
-  });
-
-  webRtcVideo.addEventListener('mouseup', (e) => {
-    if (!isControlEnabled || webStreamMode !== 'webrtc') return;
-    const p = getNormalizedVideoPos(e.clientX, e.clientY);
-    sendControlMsg({ t: 'up', x: p.x, y: p.y, b: e.button === 2 ? 2 : 0 });
-  });
-
-  webRtcVideo.addEventListener('contextmenu', (e) => {
-    if (!isControlEnabled || webStreamMode !== 'webrtc') return;
-    e.preventDefault();
-  });
-
-  webRtcVideo.addEventListener('wheel', (e) => {
-    if (!isControlEnabled || webStreamMode !== 'webrtc') return;
-    e.preventDefault();
-    const dy = e.deltaY > 0 ? -160 : 160;
-    sendControlMsg({ t: 'wheel', dy });
-  }, { passive: false });
-
-  // iPhone / Android Touch Support on WebRTC Video
-  let touchStartX = 0, touchStartY = 0, touchStartTime = 0, touchDragging = false, longPressTimer = null, lastTapTime = 0;
-
-  webRtcVideo.addEventListener('touchstart', (e) => {
-    if (!isControlEnabled || webStreamMode !== 'webrtc' || e.touches.length !== 1) return;
-    e.preventDefault();
-    const t = e.touches[0];
-    touchStartX = t.clientX;
-    touchStartY = t.clientY;
-    touchStartTime = Date.now();
-    touchDragging = false;
-
-    const p = getNormalizedVideoPos(t.clientX, t.clientY);
-    longPressTimer = setTimeout(() => {
-      if (!touchDragging) {
-        sendControlMsg({ t: 'rclick', x: p.x, y: p.y });
-        longPressTimer = null;
-      }
-    }, 550);
-  }, { passive: false });
-
-  webRtcVideo.addEventListener('touchmove', (e) => {
-    if (!isControlEnabled || webStreamMode !== 'webrtc' || e.touches.length !== 1) return;
-    e.preventDefault();
-    const t = e.touches[0];
-    const dist = Math.hypot(t.clientX - touchStartX, t.clientY - touchStartY);
-    const p = getNormalizedVideoPos(t.clientX, t.clientY);
-
-    if (!touchDragging && dist > 12) {
-      touchDragging = true;
-      if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
-      const startP = getNormalizedVideoPos(touchStartX, touchStartY);
-      sendControlMsg({ t: 'down', x: startP.x, y: startP.y, b: 0 });
-    }
-    if (touchDragging) {
+  function bindInteractiveSurface(el) {
+    el.addEventListener('mousemove', (e) => {
+      if (!isControlEnabled || webStreamMode !== 'webrtc') return;
       const now = performance.now();
-      if (now - lastMoveTs >= 25) {
-        lastMoveTs = now;
-        sendControlMsg({ t: 'move', x: p.x, y: p.y });
+      if (now - lastMoveTs < 30) return;
+      lastMoveTs = now;
+      const p = getNormalizedVideoPos(e.clientX, e.clientY, el);
+      sendControlMsg({ t: 'move', x: p.x, y: p.y });
+    });
+
+    el.addEventListener('mousedown', (e) => {
+      if (!isControlEnabled || !isWebStreaming) return;
+      if (webStreamMode !== 'webrtc') return;
+      const p = getNormalizedVideoPos(e.clientX, e.clientY, el);
+      sendControlMsg({ t: 'down', x: p.x, y: p.y, b: e.button === 2 ? 2 : 0 });
+    });
+
+    el.addEventListener('mouseup', (e) => {
+      if (!isControlEnabled || !isWebStreaming) return;
+      const p = getNormalizedVideoPos(e.clientX, e.clientY, el);
+      if (webStreamMode === 'webrtc') {
+        sendControlMsg({ t: 'up', x: p.x, y: p.y, b: e.button === 2 ? 2 : 0 });
+      } else if (e.pointerType !== 'touch') {
+        sendControlMsg({ t: e.button === 2 ? 'rclick' : 'click', x: p.x, y: p.y, b: e.button === 2 ? 2 : 0 });
       }
-    }
-  }, { passive: false });
+    });
 
-  webRtcVideo.addEventListener('touchend', (e) => {
-    if (!isControlEnabled || webStreamMode !== 'webrtc') return;
-    e.preventDefault();
-    if (longPressTimer) {
-      clearTimeout(longPressTimer);
-      longPressTimer = null;
-    } else if (!touchDragging && Date.now() - touchStartTime >= 550) {
-      return; // Already fired right click
-    }
+    el.addEventListener('contextmenu', (e) => {
+      if (!isControlEnabled || !isWebStreaming) return;
+      e.preventDefault();
+    });
 
-    const t = e.changedTouches[0];
-    const p = getNormalizedVideoPos(t.clientX, t.clientY);
-    if (touchDragging) {
-      sendControlMsg({ t: 'up', x: p.x, y: p.y, b: 0 });
-    } else {
+    el.addEventListener('wheel', (e) => {
+      if (!isWebStreaming) return;
+      e.preventDefault();
+      if (e.ctrlKey) {
+        setStreamZoom(streamZoom + (e.deltaY < 0 ? 0.25 : -0.25));
+        return;
+      }
+      if (!isControlEnabled) return;
+      const dy = e.deltaY > 0 ? -160 : 160;
+      sendControlMsg({ t: 'wheel', dy });
+    }, { passive: false });
+
+    let touchStartX = 0, touchStartY = 0, touchStartTime = 0, touchMoved = false;
+    let longPressTimer = null, lastTapTime = 0, lastTouchX = 0, lastTouchY = 0;
+    let pinchStartDist = 0, pinchStartZoom = 1, pinchMidX = 0, pinchMidY = 0;
+
+    el.addEventListener('touchstart', (e) => {
+      if (!isWebStreaming) return;
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+        const t0 = e.touches[0], t1 = e.touches[1];
+        pinchStartDist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY) || 1;
+        pinchStartZoom = streamZoom;
+        pinchMidX = (t0.clientX + t1.clientX) / 2;
+        pinchMidY = (t0.clientY + t1.clientY) / 2;
+        return;
+      }
+      if (!isControlEnabled && !isPanMode) return;
+      if (e.touches.length !== 1) return;
+      e.preventDefault();
+      const t = e.touches[0];
+      touchStartX = lastTouchX = t.clientX;
+      touchStartY = lastTouchY = t.clientY;
+      touchStartTime = Date.now();
+      touchMoved = false;
+
+      if (!isPanMode && isControlEnabled) {
+        const p = getNormalizedVideoPos(t.clientX, t.clientY, el);
+        longPressTimer = setTimeout(() => {
+          if (!touchMoved) {
+            sendControlMsg({ t: 'rclick', x: p.x, y: p.y });
+            longPressTimer = null;
+          }
+        }, 520);
+      }
+    }, { passive: false });
+
+    el.addEventListener('touchmove', (e) => {
+      if (!isWebStreaming) return;
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        const t0 = e.touches[0], t1 = e.touches[1];
+        const dist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY) || 1;
+        const midX = (t0.clientX + t1.clientX) / 2;
+        const midY = (t0.clientY + t1.clientY) / 2;
+        streamZoom = Math.max(1.0, Math.min(4.0, pinchStartZoom * (dist / pinchStartDist)));
+        streamPanX += (midX - pinchMidX);
+        streamPanY += (midY - pinchMidY);
+        pinchMidX = midX;
+        pinchMidY = midY;
+        applyStreamZoomTransform();
+        return;
+      }
+      if (e.touches.length !== 1) return;
+      e.preventDefault();
+      const t = e.touches[0];
+      const dx = t.clientX - lastTouchX;
+      const dy = t.clientY - lastTouchY;
+      lastTouchX = t.clientX;
+      lastTouchY = t.clientY;
+      if (Math.hypot(t.clientX - touchStartX, t.clientY - touchStartY) > 10) {
+        touchMoved = true;
+        if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+      }
+      if (isPanMode && streamZoom > 1.0) {
+        streamPanX += dx;
+        streamPanY += dy;
+        applyStreamZoomTransform();
+        return;
+      }
+      if (touchMoved && isControlEnabled) {
+        const now = performance.now();
+        const minGap = webStreamMode === 'webrtc' ? 28 : 220;
+        if (now - lastMoveTs >= minGap) {
+          lastMoveTs = now;
+          const p = getNormalizedVideoPos(t.clientX, t.clientY, el);
+          sendControlMsg({ t: 'move', x: p.x, y: p.y });
+        }
+      }
+    }, { passive: false });
+
+    el.addEventListener('touchend', (e) => {
+      if (!isWebStreaming) return;
+      e.preventDefault();
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      } else if (!touchMoved && Date.now() - touchStartTime >= 520) {
+        return;
+      }
+      if (e.touches.length > 0 || touchMoved || !isControlEnabled) return;
+
+      const t = e.changedTouches[0];
+      const p = getNormalizedVideoPos(t.clientX, t.clientY, el);
       const now = Date.now();
       if (now - lastTapTime < 320) {
         sendControlMsg({ t: 'dblclick', x: p.x, y: p.y });
@@ -856,21 +949,11 @@ function setupRemoteControlHandlers() {
         sendControlMsg({ t: 'click', x: p.x, y: p.y, b: 0 });
         lastTapTime = now;
       }
-    }
-  }, { passive: false });
+    }, { passive: false });
+  }
 
-  // Interactive tap/click support on fallback Cloud HD / LAN image stream as well
-  webLiveScreen.addEventListener('click', (e) => {
-    if (!isControlEnabled || (webStreamMode !== 'cloud' && webStreamMode !== 'lan')) return;
-    const p = getNormalizedVideoPos(e.clientX, e.clientY, webLiveScreen);
-    sendControlMsg({ t: 'click', x: p.x, y: p.y, b: 0 });
-  });
-  webLiveScreen.addEventListener('contextmenu', (e) => {
-    if (!isControlEnabled || (webStreamMode !== 'cloud' && webStreamMode !== 'lan')) return;
-    e.preventDefault();
-    const p = getNormalizedVideoPos(e.clientX, e.clientY, webLiveScreen);
-    sendControlMsg({ t: 'rclick', x: p.x, y: p.y });
-  });
+  bindInteractiveSurface(webRtcVideo);
+  bindInteractiveSurface(webLiveScreen);
 }
 
 async function toggleWebStream() {
@@ -1139,6 +1222,7 @@ async function tryWebRtcStream() {
     }
 
     streamSpinnerText.innerText = 'Opening P2P 30+ FPS Video Stream...';
+    const mediaTimeoutMs = (resolvedIce.extra && resolvedIce.extra.length > 0) ? 10000 : 5500;
     mediaTimer = setTimeout(() => {
       if (mediaReject) {
         const rej = mediaReject;
@@ -1146,7 +1230,7 @@ async function tryWebRtcStream() {
         mediaReject = null;
         rej(new Error('WebRTC ICE/Media connection timeout'));
       }
-    }, 10000);
+    }, mediaTimeoutMs);
 
     await rtcPc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
     await mediaPromise;
@@ -1257,6 +1341,7 @@ async function startWebStream() {
     webStreamMode = 'lan';
     webStreamStatusText.innerText = 'LAN HD STREAM 🟢';
     webStreamStatusBadge.style.color = '#10B981';
+    webLiveScreen.classList.toggle('control-active', isControlEnabled);
     remoteControlBar.style.display = 'flex';
     addLog('STREAM', '⚡ Connected to Local LAN PC Stream! 30+ FPS Active.');
     runLanStreamLoop();
@@ -1264,8 +1349,9 @@ async function startWebStream() {
     webStreamMode = 'cloud';
     webStreamStatusText.innerText = 'FIREBASE CLOUD ☁️';
     webStreamStatusBadge.style.color = '#00E5FF';
+    webLiveScreen.classList.toggle('control-active', isControlEnabled);
     remoteControlBar.style.display = 'flex';
-    addLog('STREAM', '☁️ Connected via Firebase Cloud Worldwide Stream (HTTPS Control Active).');
+    addLog('STREAM', '☁️ Connected via Firebase Cloud Worldwide Stream (Mouse & Zoom Active).');
     runCloudStreamLoop();
   }
 }
@@ -1273,6 +1359,7 @@ async function startWebStream() {
 function stopWebStream() {
   isWebStreaming = false;
   lastCloudFrameTs = 0;
+  setStreamZoom(1.0);
   btnToggleStreamText.innerText = 'Start Stream';
   btnToggleStreamIcon.innerText = '▶️';
   btnToggleStream.classList.remove('btn-danger');
