@@ -160,6 +160,11 @@
               <label for="cfgLocalIp">PC Local IP (Optional LAN Mode)</label>
               <input type="text" id="cfgLocalIp" value="192.168.1.10" placeholder="192.168.x.x">
             </div>
+
+            <div class="input-field" style="grid-column: 1 / -1;">
+              <label for="cfgTurnConfig">Worldwide TURN Relay API URL / JSON (Optional — Strict 4G CG-NAT &amp; Firewalls)</label>
+              <input type="text" id="cfgTurnConfig" value="" placeholder="Metered API URL (https://...metered.live/api/v1/turn/credentials?apiKey=...) or TURN JSON">
+            </div>
           </div>
 
           <div class="btn-row">
@@ -309,6 +314,6 @@
 
   </div>
 
-  <script src="script.js?v=7"></script>
+  <script src="script.js?v=8"></script>
 </body>
 </html>

@@ -86,6 +86,7 @@ const AppState = {
   deviceId: localStorage.getItem('fp_device_id') || 'PC-MUSTAJAB-12',
   secretToken: localStorage.getItem('fp_secret_token') || 'mysecretcode2026',
   localIp: localStorage.getItem('fp_local_ip') || '192.168.1.10',
+  turnConfig: localStorage.getItem('fp_turn_config') || '',
   isScanning: false
 };
 
@@ -110,6 +111,7 @@ const cfgProjectId = document.getElementById('cfgProjectId');
 const cfgDeviceId = document.getElementById('cfgDeviceId');
 const cfgSecretToken = document.getElementById('cfgSecretToken');
 const cfgLocalIp = document.getElementById('cfgLocalIp');
+const cfgTurnConfig = document.getElementById('cfgTurnConfig');
 const cfgNewWebPin = document.getElementById('cfgNewWebPin');
 const cfgConfirmWebPin = document.getElementById('cfgConfirmWebPin');
 const btnUpdateWebPin = document.getElementById('btnUpdateWebPin');
@@ -172,6 +174,7 @@ let webFrameCount = 0;
 let webFpsTimer = Date.now();
 let lastCloudFrameTs = 0;
 let dashboardInitialized = false;
+let cloudDeviceSynced = false;
 let failedPinAttempts = parseInt(localStorage.getItem('fp_pin_fails') || '0', 10);
 let pinLockoutUntil = parseInt(localStorage.getItem('fp_pin_lockout') || '0', 10);
 
@@ -188,6 +191,7 @@ async function fetchCloudPinHash(projectId, deviceId) {
     if (resp.ok) {
       const data = await resp.json();
       if (data && data.fields) {
+        cloudDeviceSynced = true;
         if (data.fields.localIp && data.fields.localIp.stringValue) {
           const cloudIp = data.fields.localIp.stringValue.trim();
           if (cloudIp && cloudIp !== '127.0.0.1') {
@@ -195,6 +199,12 @@ async function fetchCloudPinHash(projectId, deviceId) {
             localStorage.setItem('fp_local_ip', cloudIp);
             if (cfgLocalIp) cfgLocalIp.value = cloudIp;
           }
+        }
+        if (data.fields.iceJson && typeof data.fields.iceJson.stringValue === 'string') {
+          const cloudIce = data.fields.iceJson.stringValue.trim();
+          AppState.turnConfig = cloudIce;
+          localStorage.setItem('fp_turn_config', cloudIce);
+          if (cfgTurnConfig) cfgTurnConfig.value = cloudIce;
         }
         if (data.fields.webPinHash && data.fields.webPinHash.stringValue) {
           const cloudHash = data.fields.webPinHash.stringValue.trim().toLowerCase();
@@ -427,6 +437,7 @@ function initDashboard() {
   cfgDeviceId.value = AppState.deviceId;
   cfgSecretToken.value = AppState.secretToken;
   cfgLocalIp.value = AppState.localIp;
+  if (cfgTurnConfig) cfgTurnConfig.value = AppState.turnConfig;
   deviceDisplayId.innerText = AppState.deviceId;
 
   if (!dashboardInitialized) {
@@ -460,16 +471,27 @@ function saveConfig() {
   AppState.deviceId = cfgDeviceId.value.trim() || 'PC-MUSTAJAB-12';
   AppState.secretToken = cfgSecretToken.value.trim() || 'mysecretcode2026';
   AppState.localIp = cfgLocalIp.value.trim() || '127.0.0.1';
+  AppState.turnConfig = cfgTurnConfig ? cfgTurnConfig.value.trim() : '';
 
   localStorage.setItem('fp_project_id', AppState.projectId);
   localStorage.setItem('fp_device_id', AppState.deviceId);
   localStorage.setItem('fp_secret_token', AppState.secretToken);
   localStorage.setItem('fp_local_ip', AppState.localIp);
+  localStorage.setItem('fp_turn_config', AppState.turnConfig);
 
   deviceDisplayId.innerText = AppState.deviceId;
   gateDeviceLabel.innerText = AppState.deviceId;
-  addLog('CONFIG', `Settings updated: Device=${AppState.deviceId}, Project=${AppState.projectId}`);
-  alert('Configuration saved successfully!');
+
+  // Sync optional TURN Relay config to Firebase Cloud so PC + iPhone + Android share it
+  const syncUrl = `https://firestore.googleapis.com/v1/projects/${AppState.projectId}/databases/(default)/documents/devices/${AppState.deviceId}?updateMask.fieldPaths=iceJson`;
+  fetch(syncUrl, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fields: { iceJson: { stringValue: AppState.turnConfig } } })
+  }).catch(() => {});
+
+  addLog('CONFIG', `Settings updated & synced: Device=${AppState.deviceId}, Project=${AppState.projectId}`);
+  alert('Configuration saved & synced to Cloud!');
 }
 
 function triggerBiometricAction(cmd) {
@@ -499,12 +521,13 @@ function triggerBiometricAction(cmd) {
 }
 
 async function sendRemoteCommand(command) {
-  addLog('DISPATCH', `Broadcasting ${command} signal to PC: ${AppState.deviceId}...`);
+  const isCtrl = typeof command === 'string' && command.startsWith('CTRL:');
+  if (!isCtrl) addLog('DISPATCH', `Broadcasting ${command} signal to PC: ${AppState.deviceId}...`);
 
   let sent = false;
 
-  // 1. Try local LAN first if on same network
-  if (AppState.localIp) {
+  // 1. Try local LAN first if on same HTTP network
+  if (window.location.protocol !== 'https:' && AppState.localIp) {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 1200);
@@ -523,7 +546,7 @@ async function sendRemoteCommand(command) {
 
       if (resp.ok) {
         sent = true;
-        addLog('CLIENT', `⚡ PC executed ${command} via Local Network (<15ms)!`);
+        if (!isCtrl) addLog('CLIENT', `⚡ PC executed ${command} via Local Network (<15ms)!`);
       }
     } catch (e) {
       // Local fallback
@@ -550,7 +573,7 @@ async function sendRemoteCommand(command) {
       });
 
       if (res.ok) {
-        addLog('CLOUD', `✅ Firestore token dispatched! PC will execute anywhere worldwide.`);
+        if (!isCtrl) addLog('CLOUD', `✅ Firestore token dispatched! PC will execute anywhere worldwide.`);
       } else {
         await sendToRtdb(command);
       }
@@ -635,18 +658,25 @@ function setupStreamListeners() {
 }
 
 function sendControlMsg(obj) {
-  if (!isControlEnabled || !rtcDataChannel || rtcDataChannel.readyState !== 'open') return;
-  try {
-    rtcDataChannel.send(JSON.stringify(obj));
-  } catch (e) {}
+  if (!isControlEnabled || !isWebStreaming) return;
+  const payload = JSON.stringify(obj);
+  if (webStreamMode === 'webrtc' && rtcDataChannel && rtcDataChannel.readyState === 'open') {
+    try { rtcDataChannel.send(payload); } catch (e) {}
+    return;
+  }
+  if (webStreamMode === 'cloud' || webStreamMode === 'lan') {
+    // Fallback interactive control over HTTPS / LAN HTTP even when WebRTC is blocked
+    sendRemoteCommand('CTRL:' + payload).catch(() => {});
+  }
 }
 
-function getNormalizedVideoPos(clientX, clientY) {
-  const rect = webRtcVideo.getBoundingClientRect();
+function getNormalizedVideoPos(clientX, clientY, targetEl) {
+  const el = targetEl || (webStreamMode === 'webrtc' ? webRtcVideo : webLiveScreen);
+  const rect = el.getBoundingClientRect();
   if (!rect.width || !rect.height) return { x: 0.5, y: 0.5 };
 
-  const vw = webRtcVideo.videoWidth || rect.width;
-  const vh = webRtcVideo.videoHeight || rect.height;
+  const vw = el.videoWidth || el.naturalWidth || rect.width;
+  const vh = el.videoHeight || el.naturalHeight || rect.height;
   const elemRatio = rect.width / rect.height;
   const vidRatio = vw / vh;
 
@@ -828,6 +858,19 @@ function setupRemoteControlHandlers() {
       }
     }
   }, { passive: false });
+
+  // Interactive tap/click support on fallback Cloud HD / LAN image stream as well
+  webLiveScreen.addEventListener('click', (e) => {
+    if (!isControlEnabled || (webStreamMode !== 'cloud' && webStreamMode !== 'lan')) return;
+    const p = getNormalizedVideoPos(e.clientX, e.clientY, webLiveScreen);
+    sendControlMsg({ t: 'click', x: p.x, y: p.y, b: 0 });
+  });
+  webLiveScreen.addEventListener('contextmenu', (e) => {
+    if (!isControlEnabled || (webStreamMode !== 'cloud' && webStreamMode !== 'lan')) return;
+    e.preventDefault();
+    const p = getNormalizedVideoPos(e.clientX, e.clientY, webLiveScreen);
+    sendControlMsg({ t: 'rclick', x: p.x, y: p.y });
+  });
 }
 
 async function toggleWebStream() {
@@ -865,7 +908,9 @@ function waitWebRtcIce(pc, maxMs) {
     let softTimer = null;
     pc.onicecandidate = e => {
       if (e.candidate) {
-        if (!softTimer) softTimer = setTimeout(finish, 350);
+        const cs = e.candidate.candidate || '';
+        const isPublic = (cs.indexOf(' typ srflx') >= 0 || cs.indexOf(' typ relay') >= 0);
+        if (isPublic && !softTimer) softTimer = setTimeout(finish, 350);
       } else {
         clearTimeout(hardTimer);
         if (softTimer) clearTimeout(softTimer);
@@ -882,6 +927,49 @@ function waitWebRtcIce(pc, maxMs) {
   });
 }
 
+async function resolveDynamicIceServers() {
+  const base = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun.cloudflare.com:3478' },
+    { urls: 'stun:stun.relay.metered.ca:80' },
+    { urls: 'stun:stun.relay.metered.ca:443' }
+  ];
+  let extra = [];
+  try {
+    let raw = (AppState.turnConfig || '').trim();
+    if (!raw && !cloudDeviceSynced) {
+      const devUrl = `https://firestore.googleapis.com/v1/projects/${AppState.projectId}/databases/(default)/documents/devices/${AppState.deviceId}`;
+      const c = new AbortController();
+      const t = setTimeout(() => c.abort(), 900);
+      const r = await fetch(devUrl, { cache: 'no-store', signal: c.signal });
+      clearTimeout(t);
+      if (r.ok) {
+        cloudDeviceSynced = true;
+        const d = await r.json();
+        raw = (d && d.fields && d.fields.iceJson && d.fields.iceJson.stringValue || '').trim();
+        if (raw) {
+          AppState.turnConfig = raw;
+          localStorage.setItem('fp_turn_config', raw);
+          if (cfgTurnConfig) cfgTurnConfig.value = raw;
+        }
+      }
+    }
+    if (raw.startsWith('[')) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) extra = arr;
+    } else if (raw.startsWith('https://')) {
+      const r = await fetch(raw, { cache: 'no-store' });
+      if (r.ok) {
+        const arr = await r.json();
+        if (Array.isArray(arr)) extra = arr;
+      }
+    }
+  } catch (e) {}
+  return { iceServers: base.concat(extra), extra };
+}
+
 async function tryWebRtcStream() {
   if (!window.RTCPeerConnection) {
     addLog('STREAM', 'WebRTC unsupported in this browser.');
@@ -889,16 +977,13 @@ async function tryWebRtcStream() {
   }
   try {
     const sessionId = 's_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
-    // Wake PC WebRTC engine immediately in parallel while gathering ICE candidates
+    // Wake PC WebRTC engine immediately in parallel while resolving ICE/TURN & gathering candidates
     sendRemoteCommand('WEBRTC_ON').catch(() => {});
 
+    const resolvedIce = await resolveDynamicIceServers();
     rtcPc = new RTCPeerConnection({
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun2.l.google.com:19302' },
-        { urls: 'stun:stun.cloudflare.com:3478' }
-      ]
+      iceServers: resolvedIce.iceServers,
+      iceCandidatePoolSize: 2
     });
 
     rtcPc.addTransceiver('video', { direction: 'recvonly' });
@@ -985,7 +1070,7 @@ async function tryWebRtcStream() {
 
     const offer = await rtcPc.createOffer();
     await rtcPc.setLocalDescription(offer);
-    await waitWebRtcIce(rtcPc, 1000);
+    await waitWebRtcIce(rtcPc, 2200);
     if (!isWebStreaming || !rtcPc) return false;
 
     const offerSdp = rtcPc.localDescription.sdp;
@@ -1016,21 +1101,20 @@ async function tryWebRtcStream() {
     if (!answerSdp) {
       streamSpinnerText.innerText = 'Signaling PC via Firebase WebRTC...';
       const rtcUrl = `https://firestore.googleapis.com/v1/projects/${AppState.projectId}/databases/(default)/documents/screens/${AppState.deviceId}_rtc`;
-      await Promise.all([
-        fetch(`${rtcUrl}?updateMask.fieldPaths=sessionId&updateMask.fieldPaths=offerSdp&updateMask.fieldPaths=offerTs&updateMask.fieldPaths=token`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            fields: {
-              sessionId: { stringValue: sessionId },
-              offerSdp: { stringValue: offerSdp },
-              offerTs: { integerValue: String(Date.now()) },
-              token: { stringValue: AppState.secretToken }
-            }
-          })
-        }),
-        sendRemoteCommand('WEBRTC_ON')
-      ]);
+      const extraIceStr = (resolvedIce.extra && resolvedIce.extra.length > 0) ? JSON.stringify(resolvedIce.extra) : '';
+      await fetch(`${rtcUrl}?updateMask.fieldPaths=sessionId&updateMask.fieldPaths=offerSdp&updateMask.fieldPaths=offerTs&updateMask.fieldPaths=token&updateMask.fieldPaths=iceJson`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fields: {
+            sessionId: { stringValue: sessionId },
+            offerSdp: { stringValue: offerSdp },
+            offerTs: { integerValue: String(Date.now()) },
+            token: { stringValue: AppState.secretToken },
+            iceJson: { stringValue: extraIceStr }
+          }
+        })
+      });
 
       streamSpinnerText.innerText = 'Waiting for PC WebRTC Answer...';
       const pollStart = Date.now();
@@ -1173,13 +1257,15 @@ async function startWebStream() {
     webStreamMode = 'lan';
     webStreamStatusText.innerText = 'LAN HD STREAM 🟢';
     webStreamStatusBadge.style.color = '#10B981';
+    remoteControlBar.style.display = 'flex';
     addLog('STREAM', '⚡ Connected to Local LAN PC Stream! 30+ FPS Active.');
     runLanStreamLoop();
   } else {
     webStreamMode = 'cloud';
     webStreamStatusText.innerText = 'FIREBASE CLOUD ☁️';
     webStreamStatusBadge.style.color = '#00E5FF';
-    addLog('STREAM', '☁️ Connected via Firebase Cloud Worldwide Stream.');
+    remoteControlBar.style.display = 'flex';
+    addLog('STREAM', '☁️ Connected via Firebase Cloud Worldwide Stream (HTTPS Control Active).');
     runCloudStreamLoop();
   }
 }
