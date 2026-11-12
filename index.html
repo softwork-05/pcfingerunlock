@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>PC FingerUnlock - Biometric Security Control Hub</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=4">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -14,7 +14,56 @@
   <div class="glow-orb orb-1"></div>
   <div class="glow-orb orb-2"></div>
 
-  <div class="app-container">
+  <!-- PIN Security Gate Overlay (Blocks access until PIN verified) -->
+  <div class="pin-gate-overlay" id="pinLockOverlay">
+    <div class="pin-gate-card glass">
+      <div class="pin-gate-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+        </svg>
+      </div>
+      <h2>ACCESS <span>LOCKED</span></h2>
+      <p class="pin-gate-sub">Enter your Security PIN to access PC controls &amp; live screen stream.</p>
+
+      <form id="pinGateForm" class="pin-gate-form" autocomplete="off">
+        <div class="pin-input-wrap">
+          <input
+            type="password"
+            id="pinLockInput"
+            inputmode="numeric"
+            placeholder="Enter Access PIN"
+            maxlength="16"
+            required
+          >
+          <button type="button" id="btnTogglePinEye" class="pin-eye-btn" aria-label="Show or hide PIN">👁️</button>
+        </div>
+
+        <label class="pin-remember-label">
+          <input type="checkbox" id="chkRememberDevice">
+          <span>Remember this device</span>
+        </label>
+
+        <div id="pinGateError" class="pin-gate-error" style="display: none;"></div>
+
+        <button type="submit" id="btnUnlockSite" class="btn-primary-glow">
+          <span>🔓</span>
+          <span>UNLOCK CONTROL HUB</span>
+        </button>
+      </form>
+
+      <div class="pin-device-switch">
+        <button type="button" id="btnToggleGateDevice" class="btn-text">Target Device: <span id="gateDeviceLabel">PC-MUSTAJAB-12</span> ▾</button>
+        <div id="gateDeviceBox" class="gate-device-box" style="display: none;">
+          <input type="text" id="gateDeviceInput" placeholder="Target Device ID">
+          <input type="text" id="gateProjectInput" placeholder="Firebase Project ID">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Protected Main Control Hub (Hidden until PIN verified) -->
+  <div class="app-container" id="appContainer" style="display: none;">
     <!-- Header -->
     <header class="hub-header">
       <div class="brand">
@@ -25,29 +74,29 @@
             <path d="M12 10a2 2 0 0 0-.38 3.96" />
           </svg>
         </div>
-        <div>
+        <div class="brand-text">
           <h1>PC FINGER<span>UNLOCK</span></h1>
           <p class="tagline">Remote Windows Biometric Authentication Gateway</p>
         </div>
       </div>
-      
+
       <div class="header-status">
         <div class="status-pill" id="globalStatusPill">
           <span class="status-dot pulsing"></span>
           <span id="globalStatusText">FIREBASE CLOUD READY</span>
         </div>
-        <button id="btnOpenGuide" class="btn-secondary">📖 Setup Guide (اردو)</button>
+        <button id="btnLockWebsite" class="btn-secondary btn-lock-site" title="Lock Web Dashboard">🔒 Lock Site</button>
       </div>
     </header>
 
     <!-- Main Grid -->
     <main class="dashboard-grid">
-      
+
       <!-- Left Column: Device Pairing & Biometric Remote -->
       <section class="card glass hero-card">
         <div class="card-header">
           <div class="badge">DEVICE CONTROLLER</div>
-          <span class="session-code" id="deviceDisplayId">PC-WINDOWS-MASTER</span>
+          <span class="session-code" id="deviceDisplayId">PC-MUSTAJAB-12</span>
         </div>
 
         <div class="fingerprint-stage">
@@ -71,7 +120,7 @@
             <span class="btn-icon">⚡</span>
             <span>TRIGGER BIOMETRIC UNLOCK</span>
           </button>
-          
+
           <div class="dual-buttons">
             <button id="btnLockPc" class="btn-danger">
               <span>🔒 Remote Lock (Win+L)</span>
@@ -83,39 +132,59 @@
         </div>
       </section>
 
-      <!-- Right Column: Settings, Pairing & Live Logs -->
+      <!-- Right Column: Settings, Pairing, PIN Security & Live Logs -->
       <section class="right-column">
         <!-- Pairing Card -->
         <div class="card glass">
           <div class="card-header">
             <h3>🔗 CLOUD &amp; PAIRING CONFIGURATION</h3>
           </div>
-          
+
           <div class="form-grid">
             <div class="input-field">
-              <label>Firebase Project ID</label>
+              <label for="cfgProjectId">Firebase Project ID</label>
               <input type="text" id="cfgProjectId" value="win-finger-unlock" placeholder="e.g. win-finger-unlock">
             </div>
 
             <div class="input-field">
-              <label>Target PC Device ID</label>
-              <input type="text" id="cfgDeviceId" value="PC-WINDOWS-MASTER" placeholder="e.g. PC-ALPHA">
+              <label for="cfgDeviceId">Target PC Device ID</label>
+              <input type="text" id="cfgDeviceId" value="PC-MUSTAJAB-12" placeholder="e.g. PC-ALPHA">
             </div>
 
             <div class="input-field">
-              <label>Pairing Secret Token</label>
-              <input type="password" id="cfgSecretToken" value="secret123" placeholder="Secret Token">
+              <label for="cfgSecretToken">Pairing Secret Token</label>
+              <input type="password" id="cfgSecretToken" value="mysecretcode2026" placeholder="Secret Token">
             </div>
 
             <div class="input-field">
-              <label>PC Local IP (Optional LAN Mode)</label>
-              <input type="text" id="cfgLocalIp" value="127.0.0.1" placeholder="192.168.x.x">
+              <label for="cfgLocalIp">PC Local IP (Optional LAN Mode)</label>
+              <input type="text" id="cfgLocalIp" value="192.168.1.10" placeholder="192.168.x.x">
             </div>
           </div>
 
           <div class="btn-row">
             <button id="btnSaveConfig" class="btn-emerald">💾 Save Configuration</button>
             <button id="btnGenerateQr" class="btn-surface">📱 Show Mobile Pairing QR</button>
+          </div>
+
+          <!-- Website Security PIN Management -->
+          <div class="pin-settings-divider"></div>
+          <div class="pin-settings-header">
+            <h4>🔐 WEBSITE ACCESS PIN PROTECTION</h4>
+            <span class="pin-status-tag" id="webPinStatusTag">PIN LOCK ACTIVE</span>
+          </div>
+          <div class="form-grid pin-change-grid">
+            <div class="input-field">
+              <label for="cfgNewWebPin">New Website PIN (4–16 chars)</label>
+              <input type="password" id="cfgNewWebPin" inputmode="numeric" placeholder="Enter new PIN" maxlength="16">
+            </div>
+            <div class="input-field">
+              <label for="cfgConfirmWebPin">Confirm New PIN</label>
+              <input type="password" id="cfgConfirmWebPin" inputmode="numeric" placeholder="Re-enter PIN" maxlength="16">
+            </div>
+          </div>
+          <div class="btn-row pin-btn-row">
+            <button id="btnUpdateWebPin" class="btn-secondary">🔑 Set &amp; Sync Website PIN</button>
           </div>
         </div>
 
@@ -127,8 +196,6 @@
           </div>
           <div class="logs-container" id="logsTerminal">
             <div class="log-entry system"><span class="log-time">[INIT]</span> System initialized. Ready for Biometric signals.</div>
-            <div class="log-entry cloud"><span class="log-time">[CLOUD]</span> Listening on Firebase Firestore: /devices/PC-WINDOWS-MASTER</div>
-            <div class="log-entry client"><span class="log-time">[CLIENT]</span> PC Windows service compiled and ready (WinFingerUnlock.exe)</div>
           </div>
         </div>
       </section>
@@ -137,10 +204,10 @@
 
     <!-- Live PC Screen Monitor Card -->
     <section class="card glass stream-section">
-      <div class="card-header">
+      <div class="card-header stream-card-header">
         <div class="stream-title-group">
           <div class="badge stream-badge-live">🎥 LIVE MONITOR</div>
-          <h3>PC SCREEN STREAM &amp; ACTIVITY VIEWER</h3>
+          <h3>PC SCREEN STREAM</h3>
         </div>
         <div class="stream-badges">
           <div class="status-pill" id="webStreamStatusBadge">
@@ -166,12 +233,13 @@
           <div class="spinner-circle"></div>
           <span>Connecting to PC Screen Stream...</span>
         </div>
+        <button id="btnExitPseudoFs" class="btn-exit-fs" style="display: none;">✕ Exit Fullscreen</button>
       </div>
 
       <!-- Stream Control Toolbar -->
       <div class="stream-toolbar">
         <div class="stream-left-actions">
-          <button id="btnToggleStream" class="btn-emerald">
+          <button id="btnToggleStream" class="btn-emerald btn-stream-main">
             <span id="btnToggleStreamIcon">▶️</span> <span id="btnToggleStreamText">Start Stream</span>
           </button>
           <button id="btnRefreshWebStream" class="btn-surface">
@@ -192,43 +260,6 @@
       </div>
     </section>
 
-    <!-- Modal: Setup Guide -->
-    <div class="modal-overlay" id="guideModal">
-      <div class="modal-content glass">
-        <div class="modal-header">
-          <h2>🔐 Windows PC Remote Fingerprint Setup Guide</h2>
-          <button class="modal-close" id="btnCloseGuide">&times;</button>
-        </div>
-        <div class="modal-body">
-          <div class="guide-lang-tabs">
-            <h3>اردو مکمل طریقہ کار (Step-by-Step)</h3>
-          </div>
-          <ol class="guide-steps">
-            <li>
-              <strong>1. PC Application چلائیں:</strong>
-              <p>فولڈر <code>pc-client\WinFingerUnlock.exe</code> کو ڈبل کلک کرکے کھولیں۔ یہ Windows کی ٹرے میں پس منظر میں چلتی رہے گی۔</p>
-            </li>
-            <li>
-              <strong>2. Windows PIN محفوظ کریں:</strong>
-              <p>PC ایپلیکیشن میں اپنا Windows PIN یا پاس ورڈ درج کرکے <em>Save Settings</em> پر کلک کریں۔ یہ ونڈوز DPAPI اینکرپشن کے ساتھ محفوظ ہوجاتا ہے۔</p>
-            </li>
-            <li>
-              <strong>3. Android APK موبائل میں انسٹال کریں:</strong>
-              <p>موبائل کے اندر <code>android-app</code> کی تیار کردہ APK فائل انسٹال کریں اور کھولیں۔</p>
-            </li>
-            <li>
-              <strong>4. پیئرنگ (Pairing) کریں:</strong>
-              <p>موبائل میں سیٹنگز (Gear icon) دبا کر وہی <strong>Device ID</strong> اور <strong>Secret Key</strong> درج کریں جو PC ایپلیکیشن میں لکھی ہے۔</p>
-            </li>
-            <li>
-              <strong>5. انگلی لگائیں اور PC کھل جائے گا:</strong>
-              <p>موبائل میں <strong>⚡ SCAN &amp; UNLOCK PC</strong> دبائیں، آپ کے موبائل پر فنگر پرنٹ اسکینر کھلے گا۔ انگلی لگاتے ہی سیکنڈوں میں PC فورا ان لاک ہوجائے گا، چاہے آپ دنیا میں کہیں بھی ہوں!</p>
-            </li>
-          </ol>
-        </div>
-      </div>
-    </div>
-
     <!-- Modal: QR Code for Mobile -->
     <div class="modal-overlay" id="qrModal">
       <div class="modal-content glass qr-modal-box">
@@ -242,7 +273,7 @@
             <!-- Dynamic Canvas -->
           </div>
           <div class="pairing-badge-row">
-            <span id="qrDeviceText">ID: PC-WINDOWS-MASTER</span>
+            <span id="qrDeviceText">ID: PC-MUSTAJAB-12</span>
           </div>
         </div>
       </div>
@@ -250,7 +281,6 @@
 
   </div>
 
-  <script src="script.js"></script>
+  <script src="script.js?v=4"></script>
 </body>
 </html>
-
