@@ -187,11 +187,21 @@ async function fetchCloudPinHash(projectId, deviceId) {
     clearTimeout(tId);
     if (resp.ok) {
       const data = await resp.json();
-      if (data && data.fields && data.fields.webPinHash && data.fields.webPinHash.stringValue) {
-        const cloudHash = data.fields.webPinHash.stringValue.trim().toLowerCase();
-        if (/^[a-f0-9]{64}$/.test(cloudHash)) {
-          localStorage.setItem('fp_web_pin_hash', cloudHash);
-          return cloudHash;
+      if (data && data.fields) {
+        if (data.fields.localIp && data.fields.localIp.stringValue) {
+          const cloudIp = data.fields.localIp.stringValue.trim();
+          if (cloudIp && cloudIp !== '127.0.0.1') {
+            AppState.localIp = cloudIp;
+            localStorage.setItem('fp_local_ip', cloudIp);
+            if (cfgLocalIp) cfgLocalIp.value = cloudIp;
+          }
+        }
+        if (data.fields.webPinHash && data.fields.webPinHash.stringValue) {
+          const cloudHash = data.fields.webPinHash.stringValue.trim().toLowerCase();
+          if (/^[a-f0-9]{64}$/.test(cloudHash)) {
+            localStorage.setItem('fp_web_pin_hash', cloudHash);
+            return cloudHash;
+          }
         }
       }
     }
@@ -855,7 +865,7 @@ function waitWebRtcIce(pc, maxMs) {
     let softTimer = null;
     pc.onicecandidate = e => {
       if (e.candidate) {
-        if (!softTimer) softTimer = setTimeout(finish, 700);
+        if (!softTimer) softTimer = setTimeout(finish, 350);
       } else {
         clearTimeout(hardTimer);
         if (softTimer) clearTimeout(softTimer);
@@ -873,9 +883,15 @@ function waitWebRtcIce(pc, maxMs) {
 }
 
 async function tryWebRtcStream() {
-  if (!window.RTCPeerConnection) return false;
+  if (!window.RTCPeerConnection) {
+    addLog('STREAM', 'WebRTC unsupported in this browser.');
+    return false;
+  }
   try {
     const sessionId = 's_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+    // Wake PC WebRTC engine immediately in parallel while gathering ICE candidates
+    sendRemoteCommand('WEBRTC_ON').catch(() => {});
+
     rtcPc = new RTCPeerConnection({
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
@@ -893,36 +909,83 @@ async function tryWebRtcStream() {
       addLog('STREAM', '🎮 Remote Mouse & Keyboard DataChannel active!');
     };
 
-    const trackPromise = new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error('WebRTC connection timeout')), 9000);
-      rtcPc.ontrack = (ev) => {
-        if (!isWebStreaming) return;
-        const stream = (ev.streams && ev.streams[0]) ? ev.streams[0] : new MediaStream([ev.track]);
-        webRtcVideo.srcObject = stream;
+    let hasTrack = false;
+    let isIceReady = false;
+    let mediaResolve = null;
+    let mediaReject = null;
+    let mediaTimer = null;
+
+    const tryCompleteMedia = () => {
+      if (!isWebStreaming || !rtcPc || !mediaResolve) return;
+      const cs = rtcPc.connectionState;
+      const ics = rtcPc.iceConnectionState;
+      if (cs === 'connected' || ics === 'connected' || ics === 'completed') isIceReady = true;
+      if (hasTrack && (isIceReady || webRtcVideo.videoWidth > 0)) {
+        if (mediaTimer) { clearTimeout(mediaTimer); mediaTimer = null; }
         webRtcVideo.style.display = 'block';
         webLiveScreen.style.display = 'none';
         streamSpinner.style.display = 'none';
-        webRtcVideo.play().catch(() => {});
-        clearTimeout(timeout);
-        resolve(true);
-      };
-      rtcPc.onconnectionstatechange = () => {
-        if (!rtcPc) return;
-        if (rtcPc.connectionState === 'connected') {
-          webStreamStatusText.innerText = 'WEBRTC 30+ FPS 🟢';
-          webStreamStatusBadge.style.color = '#10B981';
-          clearTimeout(timeout);
-          resolve(true);
-        } else if (rtcPc.connectionState === 'failed') {
-          clearTimeout(timeout);
-          reject(new Error('ICE failed'));
-        }
-      };
+        webStreamStatusText.innerText = 'WEBRTC 30+ FPS 🟢';
+        webStreamStatusBadge.style.color = '#10B981';
+        const r = mediaResolve;
+        mediaResolve = null;
+        mediaReject = null;
+        r(true);
+      }
+    };
+
+    const mediaPromise = new Promise((resolve, reject) => {
+      mediaResolve = resolve;
+      mediaReject = reject;
     });
+
+    rtcPc.ontrack = (ev) => {
+      if (!isWebStreaming) return;
+      hasTrack = true;
+      const stream = (ev.streams && ev.streams[0]) ? ev.streams[0] : new MediaStream([ev.track]);
+      webRtcVideo.muted = true;
+      webRtcVideo.playsInline = true;
+      webRtcVideo.setAttribute('playsinline', '');
+      webRtcVideo.setAttribute('webkit-playsinline', '');
+      webRtcVideo.srcObject = stream;
+      webRtcVideo.play().catch(() => {});
+      tryCompleteMedia();
+    };
+
+    webRtcVideo.onloadeddata = () => tryCompleteMedia();
+    webRtcVideo.onplaying = () => tryCompleteMedia();
+
+    rtcPc.oniceconnectionstatechange = () => {
+      if (!rtcPc) return;
+      if (rtcPc.iceConnectionState === 'connected' || rtcPc.iceConnectionState === 'completed') {
+        isIceReady = true;
+        tryCompleteMedia();
+      } else if (rtcPc.iceConnectionState === 'failed' && mediaReject) {
+        if (mediaTimer) { clearTimeout(mediaTimer); mediaTimer = null; }
+        const rej = mediaReject;
+        mediaResolve = null;
+        mediaReject = null;
+        rej(new Error('ICE connection failed'));
+      }
+    };
+
+    rtcPc.onconnectionstatechange = () => {
+      if (!rtcPc) return;
+      if (rtcPc.connectionState === 'connected') {
+        isIceReady = true;
+        tryCompleteMedia();
+      } else if (rtcPc.connectionState === 'failed' && mediaReject) {
+        if (mediaTimer) { clearTimeout(mediaTimer); mediaTimer = null; }
+        const rej = mediaReject;
+        mediaResolve = null;
+        mediaReject = null;
+        rej(new Error('Peer connection failed'));
+      }
+    };
 
     const offer = await rtcPc.createOffer();
     await rtcPc.setLocalDescription(offer);
-    await waitWebRtcIce(rtcPc, 1500);
+    await waitWebRtcIce(rtcPc, 1000);
     if (!isWebStreaming || !rtcPc) return false;
 
     const offerSdp = rtcPc.localDescription.sdp;
@@ -931,9 +994,10 @@ async function tryWebRtcStream() {
     // Fast path: Direct LAN HTTP signaling (if page loaded over HTTP)
     if (window.location.protocol !== 'https:' && AppState.localIp) {
       try {
+        streamSpinnerText.innerText = 'Connecting WebRTC via LAN...';
         const cleanIp = AppState.localIp.replace('http://', '').replace('https://', '').split(':')[0];
         const c = new AbortController();
-        const t = setTimeout(() => c.abort(), 3000);
+        const t = setTimeout(() => c.abort(), 1800);
         const r = await fetch(`http://${cleanIp}:9876/rtc/offer`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -948,25 +1012,29 @@ async function tryWebRtcStream() {
       } catch (e) {}
     }
 
-    // Worldwide Firestore WebRTC Signaling
+    // Worldwide Firestore WebRTC Signaling (up to 18s for slower mobile/HTTPS links)
     if (!answerSdp) {
+      streamSpinnerText.innerText = 'Signaling PC via Firebase WebRTC...';
       const rtcUrl = `https://firestore.googleapis.com/v1/projects/${AppState.projectId}/databases/(default)/documents/screens/${AppState.deviceId}_rtc`;
-      await fetch(`${rtcUrl}?updateMask.fieldPaths=sessionId&updateMask.fieldPaths=offerSdp&updateMask.fieldPaths=offerTs&updateMask.fieldPaths=token`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fields: {
-            sessionId: { stringValue: sessionId },
-            offerSdp: { stringValue: offerSdp },
-            offerTs: { integerValue: String(Date.now()) },
-            token: { stringValue: AppState.secretToken }
-          }
-        })
-      });
-      await sendRemoteCommand('WEBRTC_ON');
+      await Promise.all([
+        fetch(`${rtcUrl}?updateMask.fieldPaths=sessionId&updateMask.fieldPaths=offerSdp&updateMask.fieldPaths=offerTs&updateMask.fieldPaths=token`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fields: {
+              sessionId: { stringValue: sessionId },
+              offerSdp: { stringValue: offerSdp },
+              offerTs: { integerValue: String(Date.now()) },
+              token: { stringValue: AppState.secretToken }
+            }
+          })
+        }),
+        sendRemoteCommand('WEBRTC_ON')
+      ]);
 
+      streamSpinnerText.innerText = 'Waiting for PC WebRTC Answer...';
       const pollStart = Date.now();
-      while (isWebStreaming && !answerSdp && Date.now() - pollStart < 7500) {
+      while (isWebStreaming && !answerSdp && Date.now() - pollStart < 18000) {
         try {
           const r = await fetch(rtcUrl, { cache: 'no-store' });
           if (r.ok) {
@@ -982,9 +1050,22 @@ async function tryWebRtcStream() {
       }
     }
 
-    if (!answerSdp || !isWebStreaming || !rtcPc) return false;
+    if (!answerSdp || !isWebStreaming || !rtcPc) {
+      throw new Error('No WebRTC answer from PC (signaling timeout)');
+    }
+
+    streamSpinnerText.innerText = 'Opening P2P 30+ FPS Video Stream...';
+    mediaTimer = setTimeout(() => {
+      if (mediaReject) {
+        const rej = mediaReject;
+        mediaResolve = null;
+        mediaReject = null;
+        rej(new Error('WebRTC ICE/Media connection timeout'));
+      }
+    }, 10000);
+
     await rtcPc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
-    await trackPromise;
+    await mediaPromise;
 
     // Live WebRTC Stats (Real FPS & RTT Ping)
     let prevFrames = 0;
@@ -1024,6 +1105,7 @@ async function tryWebRtcStream() {
 
     return true;
   } catch (err) {
+    if (err && err.message) addLog('STREAM', 'WebRTC notice: ' + err.message);
     cleanupWebRtc();
     return false;
   }
