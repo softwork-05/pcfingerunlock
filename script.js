@@ -617,6 +617,7 @@ async function startWebStream() {
   isWebStreaming = true;
   webFrameCount = 0;
   webFpsTimer = Date.now();
+  lastCloudFrameTs = 0;
 
   btnToggleStreamText.innerText = 'Stop Stream';
   btnToggleStreamIcon.innerText = '⏹️';
@@ -632,21 +633,23 @@ async function startWebStream() {
   addLog('STREAM', `Initializing live screen stream for ${AppState.deviceId}...`);
 
   let lanWorking = false;
-  try {
-    const cleanIp = AppState.localIp.replace('http://', '').replace('https://', '').split(':')[0];
-    const ctrl = new AbortController();
-    const tId = setTimeout(() => ctrl.abort(), 1200);
+  if (window.location.protocol !== 'https:' && AppState.localIp) {
+    try {
+      const cleanIp = AppState.localIp.replace('http://', '').replace('https://', '').split(':')[0];
+      const ctrl = new AbortController();
+      const tId = setTimeout(() => ctrl.abort(), 1200);
 
-    const testResp = await fetch(`http://${cleanIp}:9876/screenshot?t=${Date.now()}`, {
-      signal: ctrl.signal
-    });
-    clearTimeout(tId);
+      const testResp = await fetch(`http://${cleanIp}:9876/screenshot?t=${Date.now()}`, {
+        signal: ctrl.signal
+      });
+      clearTimeout(tId);
 
-    if (testResp.ok) {
-      lanWorking = true;
+      if (testResp.ok) {
+        lanWorking = true;
+      }
+    } catch (e) {
+      lanWorking = false;
     }
-  } catch (e) {
-    lanWorking = false;
   }
 
   if (lanWorking) {
@@ -666,6 +669,7 @@ async function startWebStream() {
 
 function stopWebStream() {
   isWebStreaming = false;
+  lastCloudFrameTs = 0;
   btnToggleStreamText.innerText = 'Start Stream';
   btnToggleStreamIcon.innerText = '▶️';
   btnToggleStream.classList.remove('btn-danger');
@@ -748,7 +752,7 @@ async function runCloudStreamLoop() {
 
           if (ts !== lastCloudFrameTs && b64.length > 50) {
             lastCloudFrameTs = ts;
-            webLiveScreen.src = 'data:image/jpeg;base64,' + b64;
+            webLiveScreen.src = 'data:image/jpeg;base64,' + b64.replace(/\s+/g, '');
             webLiveScreen.style.display = 'block';
             streamSpinner.style.display = 'none';
 
