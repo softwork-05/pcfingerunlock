@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>PC FingerUnlock - Biometric Security Control Hub</title>
-  <link rel="stylesheet" href="style.css?v=5">
+  <link rel="stylesheet" href="style.css?v=6">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -218,22 +218,50 @@
         </div>
       </div>
 
-      <!-- Live Stream Display Canvas/Image -->
+      <!-- Live Stream Display Video (WebRTC) / Image (Fallback) -->
       <div class="screen-monitor-box" id="screenMonitorBox">
+        <video id="webRtcVideo" class="screen-img" autoplay playsinline muted webkit-playsinline style="display: none;"></video>
         <img id="webLiveScreen" alt="Live PC Screen Stream" class="screen-img" style="display: none;" />
         <div class="monitor-placeholder" id="streamPlaceholder">
           <div class="monitor-icon">🖥️</div>
-          <h4>Live PC Screen Monitoring</h4>
-          <p>Watch PC activity in real-time. Works over Local Wi-Fi (30+ FPS) or Firebase Cloud (Worldwide).</p>
+          <h4>Live PC Screen &amp; Remote Control</h4>
+          <p>30–60 FPS WebRTC real-time streaming with touch mouse &amp; keyboard control worldwide.</p>
           <button id="btnStartStreamPlaceholder" class="btn-primary-glow stream-play-btn">
             ▶️ Start Live Stream
           </button>
         </div>
         <div class="stream-spinner" id="streamSpinner" style="display: none;">
           <div class="spinner-circle"></div>
-          <span>Connecting to PC Screen Stream...</span>
+          <span id="streamSpinnerText">Connecting WebRTC 30+ FPS Stream...</span>
         </div>
         <button id="btnExitPseudoFs" class="btn-exit-fs" style="display: none;">✕ Exit Fullscreen</button>
+      </div>
+
+      <!-- Remote Control Bar (Mouse + Keyboard via WebRTC DataChannel) -->
+      <div class="remote-control-bar" id="remoteControlBar" style="display: none;">
+        <div class="remote-btn-strip">
+          <button id="btnToggleControl" class="btn-secondary active-ctrl" title="Toggle Touch/Mouse Control">🖱️ Control: ON</button>
+          <button id="btnRemoteRightClick" class="btn-surface">Right Click</button>
+          <button id="btnRemoteScrollUp" class="btn-surface">▲ Scroll</button>
+          <button id="btnRemoteScrollDown" class="btn-surface">▼ Scroll</button>
+          <button id="btnToggleRemoteKb" class="btn-surface">⌨️ Keyboard</button>
+        </div>
+        <div class="remote-kb-bar" id="remoteKbBar" style="display: none;">
+          <div class="remote-kb-input-row">
+            <input type="text" id="remoteKbInput" placeholder="Type text to send to PC..." autocomplete="off" autocorrect="off" autocapitalize="off">
+            <button id="btnSendKbText" class="btn-emerald">Send</button>
+          </div>
+          <div class="remote-special-keys">
+            <button type="button" class="btn-key" data-vk="13">Enter</button>
+            <button type="button" class="btn-key" data-vk="8">⌫ Back</button>
+            <button type="button" class="btn-key" data-vk="9">Tab</button>
+            <button type="button" class="btn-key" data-vk="27">Esc</button>
+            <button type="button" class="btn-key" data-vk="91">Win</button>
+            <button type="button" class="btn-key" data-hotkey="17,67">Ctrl+C</button>
+            <button type="button" class="btn-key" data-hotkey="17,86">Ctrl+V</button>
+            <button type="button" class="btn-key" data-hotkey="18,9">Alt+Tab</button>
+          </div>
+        </div>
       </div>
 
       <!-- Stream Control Toolbar -->
@@ -281,6 +309,6 @@
 
   </div>
 
-  <script src="script.js?v=5"></script>
+  <script src="script.js?v=6"></script>
 </body>
 </html>
